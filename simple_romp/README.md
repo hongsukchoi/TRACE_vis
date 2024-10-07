@@ -1,3 +1,11 @@
+# Quick commands
+In `simple_romp/`
+```
+CUDA_VISIBLE_DEVICES=0 python3 -m trace2.main -i /home/hongsuk/projects/ROMP/simple_romp/jump.mp4 --subject_num=1 --results_save_dir ./trace_jump_results # --save_video
+
+python global_viser_vis.py --result_npz ./trace_jump_results/jump.mp4.npz
+```
+
 # Simple_ROMP
 
 Simplified implementation of ROMP [ICCV21], BEV [CVPR22], and TRACE [CVPR23].
