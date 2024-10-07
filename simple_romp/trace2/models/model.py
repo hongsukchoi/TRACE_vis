@@ -475,6 +475,10 @@ class TRACE_head(nn.Module):
         world_global_rots6D = cam_rot_motion_maps[pred_batch_ids,:,pred_czyxs[:,1],pred_czyxs[:,2]] + params_pred[:,6:12].detach()
         world_global_rots = rot6D_to_angular(world_global_rots6D)
 
+        # Hongsuk
+        world_cam_rots6D = cam_rot_motion_maps[pred_batch_ids,:,pred_czyxs[:,1],pred_czyxs[:,2]]
+        world_cam_rots = rot6D_to_angular(world_cam_rots6D)
+
         traj_track_ids = traj_track_ids.reshape(-1).to(pred_czyxs.device)
         valid_results_mask = seq_traj_masks.reshape(-1)
         params_pred = params_pred[valid_results_mask]
@@ -483,6 +487,8 @@ class TRACE_head(nn.Module):
         normed_cams = normed_cams[valid_results_mask]
         cams_init = cams_init[valid_results_mask]
         world_cams = world_cams[valid_results_mask]
+        world_cam_rots = world_cam_rots[valid_results_mask]
+
         traj_track_ids = traj_track_ids[valid_results_mask]        
         world_global_rots = world_global_rots[valid_results_mask]
 
@@ -496,6 +502,8 @@ class TRACE_head(nn.Module):
         output = {'params_pred': params_pred, 
                   'cam': normed_cams.float(), 'cams_init': cams_init.float(), 
                   'world_cams': world_cams.float(), 'world_global_rots':world_global_rots, 
+                  'world_cam_rots': world_cam_rots,
+
                   'motion_offsets3D': motion_offsets3D.float(), 'motion_offsets2D': motion_offsets2D.float(), 
                   'pred_batch_ids': pred_batch_ids.float().to(params_pred.device), 'pred_czyxs': pred_czyxs.float(), 'top_score': top_scores.float(), 
                   'track_ids': traj_track_ids, 

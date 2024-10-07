@@ -2,7 +2,9 @@ import torch
 import copy
 import os
 
-delete_output_keys = ['params_pred', 'verts', 'verts_camed_org', 'world_verts', 'world_j3d', 'world_verts_camed_org', 'detection_flag']
+# delete_output_keys = ['params_pred', 'verts', 'verts_camed_org', 'world_verts', 'world_j3d', 'world_verts_camed_org', 'detection_flag']
+delete_output_keys = ['params_pred', 'verts', 'verts_camed_org', 'world_j3d', 'detection_flag']
+
 def remove_large_keys(outputs, del_keys=delete_output_keys):
     save_outputs = copy.deepcopy(outputs)
     for key in del_keys:
@@ -44,8 +46,12 @@ def merge_item(source, target, key):
         target[key] = torch.cat([target[key], source[key].cpu()], 0)
 
 def merge_output(split_outputs, seq_outputs):
+    # keys = ['params_pred', 'reorganize_idx', 'j3d', 'verts', 'verts_camed_org', \
+    #     'world_cams', 'world_trans', 'world_global_rots',  'world_verts', 'world_j3d', 'world_verts_camed_org',\
+    #     'pj2d_org', 'pj2d','cam_trans','detection_flag', 'pj2d_org_h36m17','joints_h36m17', 'center_confs',\
+    #     'track_ids', 'smpl_thetas', 'smpl_betas'
     keys = ['params_pred', 'reorganize_idx', 'j3d', 'verts', 'verts_camed_org', \
-        'world_cams', 'world_trans', 'world_global_rots',  'world_verts', 'world_j3d', 'world_verts_camed_org',\
+        'world_cams', 'world_trans', 'world_global_rots', 'world_cam_rots', 'world_verts', 'world_j3d', 'world_verts_camed_org',\
         'pj2d_org', 'pj2d','cam_trans','detection_flag', 'pj2d_org_h36m17','joints_h36m17', 'center_confs',\
         'track_ids', 'smpl_thetas', 'smpl_betas']
     for key in keys:

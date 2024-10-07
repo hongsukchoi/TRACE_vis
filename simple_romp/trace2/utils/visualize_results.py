@@ -308,7 +308,8 @@ def render_image_results(renderer, outputs, img_inds, image, rendering_cfgs, smp
 
 def visualize_predictions(outputs, imgpath, FOV, seq_save_dir, smpl_model_path):
     rendering_cfgs = {'mesh_color':'identity', 'items':'mesh,tracking', 'renderer': 'sim3dr'} # 'world_mesh' 
-    #rendering_cfgs = {'mesh_color':'identity', 'items':'mesh,tracking', 'renderer': 'pyrender'} # 'world_mesh'
+
+    # rendering_cfgs = {'mesh_color':'identity', 'items':'mesh,tracking', 'renderer': 'pyrender'} # 'world_mesh'
     renderer = setup_renderer(name=rendering_cfgs['renderer'], FOV=FOV)
     os.makedirs(seq_save_dir, exist_ok=True)
     render_images_path = visulize_result(renderer, outputs, imgpath, rendering_cfgs, seq_save_dir, smpl_model_path)

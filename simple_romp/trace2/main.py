@@ -20,6 +20,8 @@ from .results_parser.temp_result_parser import TempResultParser
 
 # default_settings = trace_settings(input_args=[])
 
+
+
 class TRACE(nn.Module):
     def __init__(self, args):
         super(TRACE, self).__init__()
@@ -99,6 +101,7 @@ class TRACE(nn.Module):
         start_frame_id = 0
         start_time = time.time()
         print(f'Processing {np.unique(list(sequence_dict.keys()))}')
+
         for meta_data in data_loader:
             seq_data, seq_name = extract_seq_data(meta_data)
             start_frame_id += len(seq_data['image'])
@@ -109,6 +112,7 @@ class TRACE(nn.Module):
 
             self.video_eval_cfg['seq_cfgs'] = self.update_sequence_cfs(seq_name)
             outputs, meta_data, seq_tracking_results, seq_kp3d_results = self.sequence_inference(seq_data, seq_name, self.video_eval_cfg)
+
             if outputs is None:
                 print('sequence', seq_name, 'has no detections at frame', sfi)
                 continue
@@ -130,7 +134,7 @@ class TRACE(nn.Module):
             np.savez(save_paths.seq_results_save_path, outputs=remove_large_keys(outputs[seq_name]), imgpaths=imgpaths[seq_name])
             np.savez(save_paths.seq_tracking_results_save_path, tracking=tracking_results[seq_name], kp3ds=kp3d_results[seq_name])
             if self.save_video:
-                visualize_predictions(outputs[seq_name], imgpaths[seq_name], self.FOV, save_paths.seq_save_dir, self.smpl_model_path)
+                visualize_predictions(outputs[seq_name], imgpaths[seq_name], self.FOV, save_paths.seq_save_dir, self.smpl_path)
 
 def main():
     args = trace_settings()
