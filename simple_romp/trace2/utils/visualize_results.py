@@ -204,12 +204,20 @@ def save_video(frame_save_paths, save_path, frame_rate=24):
         writer.write(cv2.imread(frame_path))
     writer.release()
 
+def get_color_for_sid(sid):
+    # Simple hash function to generate a color
+    hash_value = sid * 123456789 + 111111111
+    r = (hash_value & 0xFF0000) >> 16
+    g = (hash_value & 0x00FF00) >> 8
+    b = hash_value & 0x0000FF
+    return [r / 255.0, g / 255.0, b / 255.0]
+
 def render_image_results(renderer, outputs, img_inds, image, rendering_cfgs, smpl_model_path):
     triangles = torch.load(os.path.join(smpl_model_path))['f'].numpy().astype(np.int32)
     h, w = image.shape[:2]
     background = np.ones([h, h, 3], dtype=np.uint8) * 255
-    result_image = [image]
-
+    # result_image = [image]
+    result_image = []
     cam_trans = outputs['cam_trans'][img_inds]
     if rendering_cfgs['mesh_color'] == 'identity':
         if 'track_ids' in outputs:
@@ -218,6 +226,9 @@ def render_image_results(renderer, outputs, img_inds, image, rendering_cfgs, smp
             mesh_colors = mesh_color_left2right(cam_trans)
     elif rendering_cfgs['mesh_color'] == 'same':
         mesh_colors = np.array([[.9, .9, .8] for _ in range(len(cam_trans))])
+    
+    # Hongsuk - TEMP
+    mesh_colors = np.array([get_color_for_sid(sid) for sid in outputs['track_ids'][img_inds]])
 
     if rendering_cfgs['renderer'] == 'sim3dr':
         depth_order = torch.sort(cam_trans[:,2].cpu(),descending=True).indices.numpy()
@@ -302,7 +313,9 @@ def render_image_results(renderer, outputs, img_inds, image, rendering_cfgs, smp
 
     if 'tracking' in rendering_cfgs['items'] and 'track_ids' in outputs:
         for ind, kp in enumerate(outputs['pj2d_org'][img_inds].cpu().numpy()[:,0]):
-            cv2.putText(result_image[1], '{:d}'.format(outputs['track_ids'][img_inds][ind]), tuple(kp.astype(int)), cv2.FONT_HERSHEY_COMPLEX,2,(255,0,255),2)  
+            # cv2.putText(result_image[1], '{:d}'.format(outputs['track_ids'][img_inds][ind]), tuple(kp.astype(int)), cv2.FONT_HERSHEY_COMPLEX,2,(255,0,255),2)  
+            # Hongsuk
+            cv2.putText(result_image[0], '{:d}'.format(outputs['track_ids'][img_inds][ind]), tuple(kp.astype(int)), cv2.FONT_HERSHEY_COMPLEX,2,(255,0,255),2)  
     
     return np.concatenate(result_image, 0)
 

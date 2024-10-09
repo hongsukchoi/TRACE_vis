@@ -817,7 +817,7 @@ class TROMPv2(VideoBase):
         
         motion_offsets2D = motion_maps_fv[pred_batch_ids, :, pred_czyxs[:, 1], pred_czyxs[:, 2]]
         top_scores = center_maps_fv[pred_batch_ids, :, pred_czyxs[:, 1], pred_czyxs[:, 2]]
-
+        
         output = {'params_pred': params_pred, 
                   'cam': normed_cams.float(), 'cams_init': cams_init.float(), 
                   'world_cams': world_cams.float(), 'world_global_rots':world_global_rots, 

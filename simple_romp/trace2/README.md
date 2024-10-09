@@ -1,3 +1,18 @@
+# Quick commands
+In `simple_romp/`
+```
+# Single / Multi person rendering to video; just increase subject_num accordingly
+
+CUDA_VISIBLE_DEVICES=0 python3 -m trace2.main -i /home/hongsuk/projects/ROMP/simple_romp/jump.mp4 --subject_num=1 --results_save_dir ./trace_jump_results # --save_video
+
+# Single person visualization in Viser 
+python global_viser_vis.py --result_npz ./trace_jump_results/jump.mp4.npz
+
+# Multi person visualization in Viser
+python mp_global_viser_vis.py --result_npz ./tmp_results/024159_mpii_test.mp4.npz
+```
+
+
 # TRACE's code for inference & evaluation
 
  **[[Project Page]](https://arthur151.github.io/TRACE/TRACE.html) [[Paper]](http://arxiv.org/abs/2306.02850) [[Video]](https://www.youtube.com/watch?v=l8aLHDXWQRw)**

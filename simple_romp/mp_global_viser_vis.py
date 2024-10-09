@@ -6,42 +6,74 @@ import imageio
 import numpy as onp
 import time
 from scipy.spatial.transform import Rotation as R
-
+from collections import defaultdict
+from tqdm import tqdm
     
 from trace2.utils.utils import angle_axis_to_rotation_matrix
 
 
-def main(sid: int = 0, result_npz: str = None):
+def process_idx(reorganize_idx, vids=None):
+    used_org_inds = onp.unique(reorganize_idx)
+    per_img_inds = [onp.where(reorganize_idx==org_idx)[0] for org_idx in used_org_inds]
 
-    outputs = onp.load(result_npz, allow_pickle=True)['outputs'][()]
-    import pdb; pdb.set_trace()
+    return used_org_inds, per_img_inds
+
+
+def get_color_for_sid(sid):
+    # Simple hash function to generate a color
+    hash_value = sid * 123456789 + 111111111
+    r = (hash_value & 0xFF0000) >> 16
+    g = (hash_value & 0x00FF00) >> 8
+    b = hash_value & 0x0000FF
+    return (b, g, r)
+    
+
+def main(sid: int = 0, result_npz: str = None):
+    # smpl
     smpl_model_path = '/home/hongsuk/.romp/SMPL_NEUTRAL.pth'
     smpl_faces = torch.load(smpl_model_path)['f'].numpy().astype(onp.int32)
 
+    # load the output
+    outputs = onp.load(result_npz, allow_pickle=True)['outputs'][()]
     # dict_keys(['reorganize_idx', 'j3d', 'world_cams', 'world_trans', 'world_global_rots', 'world_verts_camed_org',
     # 'pj2d_org', 'pj2d', 'cam_trans', 'pj2d_org_h36m17', 'joints_h36m17', 'center_confs', 'track_ids', 'smpl_thetas', 'smpl_betas'])
 
-    # smpl
-    global_verts = torch.from_numpy(outputs['world_verts'] + outputs['world_trans'][:, None, :])  # (N, 6890, 3   )
-
-    # get camera orientation and position
-    cam_axes_in_world = torch.from_numpy(outputs['world_cam_rots']) # (N, 3)
-    cam_axes_in_world = angle_axis_to_rotation_matrix(cam_axes_in_world) # (N, 3, 3)
-   
-    cam_origin_world = torch.from_numpy(outputs['world_cams']) # (N, 3)
-
     y_up = True
     if y_up:
-        yup2ydown = angle_axis_to_rotation_matrix(torch.tensor([[onp.pi, 0, 0]])).float()
-        global_verts = (yup2ydown.mT @ global_verts.mT).mT
-        cam_axes_in_world = yup2ydown.mT @ cam_axes_in_world
-        cam_origin_world = (yup2ydown.mT @ cam_origin_world.unsqueeze(-1)).squeeze(-1)
+        yup2ydown = angle_axis_to_rotation_matrix(torch.tensor([[onp.pi, 0, 0]])).cuda().float()
+        yup2ydown = yup2ydown.expand(outputs['world_verts'].shape[0], -1, -1)
+        outputs['world_verts'] = (yup2ydown.mT @ torch.from_numpy(outputs['world_verts']).cuda().mT).mT
+        world_trans = (yup2ydown.mT @ torch.from_numpy(outputs['world_trans']).cuda().unsqueeze(-1)).squeeze(-1)
+        outputs['world_verts'] = outputs['world_verts'] + world_trans[:, None, :]
+       
+        world_cam_rots = angle_axis_to_rotation_matrix(torch.from_numpy(outputs['world_cam_rots']).cuda())
+        outputs['world_cam_rots'] = yup2ydown.mT @ world_cam_rots
+        outputs['world_cams'] = (yup2ydown.mT @ torch.from_numpy(outputs['world_cams']).cuda().unsqueeze(-1)).squeeze(-1)
 
-    # set the ground to be the minimum y value
-    ground_y = global_verts[..., 1].min()
-    global_verts[..., 1] = global_verts[..., 1] - ground_y
+    outputs['world_verts'] = outputs['world_verts'].cpu().numpy()
+    outputs['world_cam_rots'] = outputs['world_cam_rots'].cpu().numpy()
+    outputs['world_cams'] = outputs['world_cams'].cpu().numpy()
 
-    timesteps = len(global_verts)
+    data_frames = defaultdict(dict)
+    used_org_inds, per_img_inds = process_idx(outputs['reorganize_idx'])
+    for org_ind, img_inds in tqdm(list(zip(used_org_inds, per_img_inds))):
+        for img_ind in img_inds:
+            track_id = outputs['track_ids'][img_ind]
+            data_frames[org_ind][track_id] = {
+                'world_verts': outputs['world_verts'][img_ind],
+                'world_cam_rots': outputs['world_cam_rots'][img_ind],
+                'world_cams': outputs['world_cams'][img_ind],
+            }
+
+
+
+    # set the ground to be the minimum y value at the first frame
+    ground_y = min([data_frames[0][track_id]['world_verts'][..., 1].min() for track_id in data_frames[0]])
+
+    # trick scaling
+    # cam_origin_world[..., 2] = cam_origin_world[..., 2] * 0.3
+
+    timesteps = len(used_org_inds)
 
     # setup viser server
     server = viser.ViserServer()
@@ -71,38 +103,42 @@ def main(sid: int = 0, result_npz: str = None):
         gui_info = client.gui.add_text("Client ID", initial_value=str(client.client_id))
         gui_info.disabled = True
     
-    # match the y level
-    cam_origin_world[..., 1] = cam_origin_world[..., 1] - ground_y
-    
-    # trick scaling
-    # cam_origin_world[..., 2] = cam_origin_world[..., 2] * 0.3
-
     frame_nodes: list[viser.FrameHandle] = []
     for t in range(timesteps):
         # Add base frame.
         frame_nodes.append(server.scene.add_frame(f"/t{t}", show_axes=False))
 
-        server.scene.add_mesh_simple(
-            f"/t{t}/mesh",
-            vertices=onp.array(global_verts[t]),
-            faces=onp.array(smpl_faces),
-            flat_shading=False,
-            wireframe=False,
-        )
-        
-        cam_axes_matrix = cam_axes_in_world[t]
-        cam_axes_quat = R.from_matrix(cam_axes_matrix).as_quat() # xyzw
-        cam_axes_quat = cam_axes_quat[[3,0,1,2]] # wxyz
+        for track_id in data_frames[t].keys():
+            vertices = onp.array(data_frames[t][track_id]['world_verts']) 
+            # vertices[..., 1] = vertices[..., 1] - ground_y
+            vertices = vertices - ground_y # intentional
 
-        server.scene.add_frame(
-            f"/t{t}/cam",
-            wxyz=cam_axes_quat,
-            position=cam_origin_world[t],
-            show_axes=True,
-            axes_length=0.5,
-            axes_radius=0.04,
-        )
-        
+            server.scene.add_mesh_simple(
+                f"/t{t}/mesh{track_id}",
+                vertices=vertices,
+                faces=onp.array(smpl_faces),
+                flat_shading=False,
+                wireframe=False,
+                color=get_color_for_sid(track_id)
+            )
+            
+            cam_axes_matrix = data_frames[t][track_id]['world_cam_rots']
+            cam_axes_quat = R.from_matrix(cam_axes_matrix).as_quat() # xyzw
+            cam_axes_quat = cam_axes_quat[[3,0,1,2]] # wxyz
+
+            cam_origin_world = data_frames[t][track_id]['world_cams']
+            # cam_origin_world[..., 1] = cam_origin_world[..., 1] - ground_y
+            cam_origin_world = cam_origin_world - ground_y # intentional
+
+            server.scene.add_frame(
+                f"/t{t}/cam{track_id}",
+                wxyz=cam_axes_quat,
+                position=cam_origin_world,
+                show_axes=True,
+                axes_length=0.5,
+                axes_radius=0.04,
+            )
+            
 
     # Add playback UI.
     with server.gui.add_folder("Playback"):
